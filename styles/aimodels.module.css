@@ -6,21 +6,13 @@
   @apply flex flex-row p-4 justify-start shrink-0;
 }
 
-.gpuGrid {
+.modelGrid {
   @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-8;
 }
 
-.gpuCard {
+.modelCard {
   @apply relative bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden shadow-lg;
   height: 400px;
-}
-
-.backgroundText {
-  @apply absolute text-gray-200 dark:text-gray-700 text-[180px] font-bold opacity-20 select-none;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 0;
 }
 
 .content {
@@ -28,20 +20,25 @@
 }
 
 .imageContainer {
-  @apply relative flex-1 flex items-center justify-center p-6;
+  @apply relative flex-1 flex items-center justify-center p-6 bg-white dark:bg-gray-900;
   min-height: 200px;
 }
 
-.gpuImage {
+.modelImage {
   @apply max-w-full max-h-full object-contain transition-transform duration-300;
+  height: 160px;
 }
 
-.gpuCard:hover .gpuImage {
+.modelCard:hover .modelImage {
   transform: scale(1.05);
 }
 
 .details {
   @apply p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700;
+}
+
+.category {
+  @apply text-sm text-blue-600 dark:text-blue-400 font-medium mb-2;
 }
 
 .title {

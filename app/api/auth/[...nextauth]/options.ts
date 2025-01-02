@@ -1,185 +1,103 @@
-import { NextAuthOptions,SessionStrategy } from "next-auth"
-import GoogleProvider from "next-auth/providers/google"
-import CredentialsProvider from "next-auth/providers/credentials"
-import GithubProvider from "next-auth/providers/github"
-import dbConnect from "@/app/lib/db"
-import User from "@/app/model/User"
-import bcrypt from "bcryptjs"
+import type { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { compare } from "bcryptjs";
+import { connectToDatabase } from "@/lib/mongodb";
 
-const requiredEnvVars = [
-  'GOOGLE_CLIENT_ID', 
-  'GOOGLE_CLIENT_SECRET', 
-  'NEXTAUTH_SECRET',
-  'NEXTAUTH_URL',
-  'GITHUB_CLIENT_ID',
-  'GITHUB_CLIENT_SECRET'
-];
+export interface CustomUser {
+  id: string;
+  email: string;
+  name: string;
+  image?: string;
+  role: string;
+  firstname?: string;
+  lastname?: string;
+  isVerified: boolean;
+  isAdmin: boolean;
+}
 
-requiredEnvVars.forEach(env => {
-  if (!process.env[env]) {
-    throw new Error(`Missing required environment variable: ${env}`)
-  }
-});
- 
-
-export const authConfig: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code"
-        }
-      }
-    }),
-    GithubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code"
-        }
-      }
-    }),
     CredentialsProvider({
-      name: 'Credentials',
+      name: "Sign in",
       credentials: {
-        email: { label: "Email", type: "email", placeholder: "Enter your email" },
-        password: { label: "Password", type: "password", placeholder: "Enter your password" }
+        email: {
+          label: "Email",
+          type: "email",
+          placeholder: "example@example.com",
+        },
+        password: {
+          label: "Password",
+          type: "password",
+          placeholder: "Password",
+        },
       },
-      async authorize(credentials) : Promise<any> {
+      async authorize(credentials): Promise<CustomUser | null> {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email and password are required')
+          return null;
         }
-        try {
-          await dbConnect()
 
-          const user = await User.findOne({ 
-            email: (credentials.email as string).toLowerCase() 
-          }).select('+password')
+        try {
+          const { db } = await connectToDatabase();
+          const user = await db.collection("users").findOne({
+            email: credentials.email,
+          });
 
           if (!user) {
-            console.log('No user found with this email')
-            throw new Error('No user found with this email')
+            return null;
           }
 
-          const isPasswordValid = await bcrypt.compare(
-            credentials.password as string, 
+          const isPasswordValid = await compare(
+            credentials.password,
             user.password
-          )
+          );
 
           if (!isPasswordValid) {
-            console.log('Incorrect password')
-            throw new Error('Invalid password')
+            return null;
           }
-            console.log('User authenticated:', user)
+
           return {
             id: user._id.toString(),
             email: user.email,
-            name: `${user.name}`.trim()
-          }
+            name: user.name,
+            image: user.image,
+            role: user.role,
+            firstname: user.firstname,
+            lastname: user.lastname,
+            isVerified: user.isVerified || false,
+            isAdmin: user.isAdmin || false,
+          };
         } catch (error) {
-          console.error('Authentication error:', error)
-          throw error
-        }
-      }
-    })
-  ],
-  
-  pages: {
-    signIn: '/sign-in',
-    signOut: '/',
-    error: '/auth/error', 
-  },
-
-  callbacks: {
-    async redirect({ url, baseUrl }) {
-      return url.startsWith(baseUrl) ? url : baseUrl
-    },
-    async session({ session, token }) {
-        if(token){
-            // @ts-ignore
-            session.user.id = token.id
-            if (session.user && token.email) {
-                session.user.email = token.email
-                session.user.name = token.name
-                session.user.image = token.picture; 
-
-            }
-        }
-      return session
-    },
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.name = user.name
-        token.email = user.email
-        token.picture = user.image;
-
-      }
-      return token
-    },
-      async signIn({ user, account, profile }) {
-        try {
-          await dbConnect();
-    
-          // @ts-ignore
-          const image = profile?.picture || user?.image || null;
-    
-          // Check if the user already exists in the database
-          let existingUser = await User.findOne({ email: user.email });
-    
-          if (existingUser) {
-            // Update existing user details, including the provider image if it's new
-            if (!existingUser.provider || !existingUser.providerId) {
-              existingUser.provider = account?.provider;
-              existingUser.providerId = account?.providerAccountId || account?.id;
-            }
-    
-            // Update image only if it's not already set or has changed
-            if (!existingUser.image && image) {
-              existingUser.image = image;
-            }
-    
-            await existingUser.save();
-          } else {
-            // Create a new user with the provider information
-            await User.create({
-              id: user.id || account?.id,
-              name: user.name,
-              email: user.email,
-              isVerified: true,
-              image: image, // Save the image to the database
-              provider: account?.provider,
-              providerId: account?.providerAccountId || account?.id,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              status: "active",
-            });
-          }
-    
-          // Allow sign-in
-          return true;
-        } catch (error) {
-          console.error("Error in signIn callback:", error);
-          return false;
+          console.error("Error during authentication:", error);
+          return null;
         }
       },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = (user as CustomUser).role;
+        token.isVerified = (user as CustomUser).isVerified;
+        token.isAdmin = (user as CustomUser).isAdmin;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as string;
+        session.user.isVerified = token.isVerified as boolean;
+        session.user.isAdmin = token.isAdmin as boolean;
+      }
+      return session;
+    },
+  },
+  pages: {
+    signIn: "/signin",
   },
   session: {
-    strategy: "jwt" as SessionStrategy,
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    strategy: "jwt",
   },
-
-  jwt: {
-    secret: process.env.NEXTAUTH_SECRET,
-  },
-
-  debug: process.env.NODE_ENV === 'development',
   secret: process.env.NEXTAUTH_SECRET,
-} 
+}

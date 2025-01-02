@@ -1,5 +1,3 @@
-
-
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import dbConnect from '@/app/lib/db';
@@ -10,9 +8,9 @@ const registrationSchema = z.object({
   name: z.string().min(2, { message: "First name must be at least 2 characters" }),
   email: z.string().email({ message: "Invalid email address" }),
   password: z.string()
-    .min(8, { message: "Password must be at least 8 characters" })
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, {
-      message: "Password must include uppercase, lowercase, number, and special character"
+    .min(6, { message: "Password must be at least 6 characters" })
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{6,}$/, {
+      message: "Password must include at least one uppercase letter, one lowercase letter, one number, and one special character"
     })
 });
 
@@ -39,7 +37,6 @@ export async function POST(req: Request) {
       email: validatedData.email,
       password: hashedPassword,
       isVerified: false,
-      
       registeredAt: new Date()
     });
 
@@ -52,30 +49,16 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error);
-
-    // Handle validation errors
-    if (error instanceof z.ZodError) {
+    if (error.name === 'ZodError') {
       return NextResponse.json(
-        { 
-          error: 'Validation failed',
-          details: error.errors 
-        },
+        { error: error.errors[0].message },
         { status: 400 }
       );
     }
-
-    if (error instanceof Error && error.message.includes('duplicate key')) {
-      console.error('Error creating user:', error.message);
-      return NextResponse.json(
-        { error: 'Email already exists' },
-        { status: 400 }
-      );
-    }
-
     return NextResponse.json(
-      { error: 'Error creating user' },
+      { error: 'Registration failed' },
       { status: 500 }
     );
   }
@@ -84,7 +67,7 @@ export async function POST(req: Request) {
 // Optional: Add rate limiting to prevent brute force attacks
 export async function GET() {
   return NextResponse.json(
-    { error: 'Method Not Allowed' },
+    { message: 'Method not allowed' },
     { status: 405 }
   );
 }

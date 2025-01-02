@@ -3,24 +3,33 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { Loader, Moon, Sun} from 'lucide-react'; // implement the logout and login signUp module here.
-// import { LoginModal } from "./modals/loginModals";
+import { Loader, Moon, Sun, ShoppingCart, Bell } from 'lucide-react'; 
 import logoNight from "@/public/logo-night.svg";
 import logo from "../public/logo.svg";
 import search from "../public/search.svg";
 import bell from "../public/bell.svg";
 import Signed from "./auth/signed-in";
 import { useEffect, useState } from "react";
+import { useCart } from '@/app/context/CartContext';
 
 const Header = () => {
   const { theme, setTheme } = useTheme();
   const [ load, setLoad ] = useState(false);
+  const [showCart, setShowCart] = useState(false);
+  const { state } = useCart();
+
+  const totalItems = (state.gpu ? 1 : 0) + (state.aiModel ? 1 : 0);
+  const totalPrice = (state.gpu?.price || 0) + (state.aiModel?.price || 0);
 
   useEffect(()=> {
     setLoad(true);
   })
-  
+
   if(!load) return <Loader></Loader>;
+
+  const handleThemeChange = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <>
@@ -53,7 +62,7 @@ const Header = () => {
             <input
               type="text"
               className={`w-full focus:border-none focus:outline-none mx-4 ${
-                theme === "dark" ?
+                theme === "dark" ? 
                  "bg-black" :
                  "bg-gray-200"
               }`}
@@ -79,6 +88,84 @@ const Header = () => {
               </div>
 
               <Signed/>
+
+              <div className="relative">
+                <button 
+                  onClick={() => setShowCart(!showCart)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1A1A1A] hover:bg-[#222] text-white"
+                >
+                  <ShoppingCart size={20} />
+                  <div className="flex flex-col items-start">
+                    <span className="text-xs text-gray-400">{totalItems} items</span>
+                    <span className="font-medium">${totalPrice}/hr</span>
+                  </div>
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center bg-blue-600 text-white text-xs rounded-full">
+                      {totalItems}
+                    </span>
+                  )}
+                </button>
+
+                {/* Cart Dropdown */}
+                {showCart && (
+                  <div className="absolute right-0 mt-2 w-80 bg-[#1A1A1A] rounded-lg shadow-lg p-4 z-50">
+                    <h3 className="text-lg font-semibold text-white mb-3">Your Cart</h3>
+                    <div className="space-y-3">
+                      {state.gpu ? (
+                        <div className="flex justify-between items-center text-white">
+                          <div>
+                            <h4 className="font-medium">{state.gpu.name}</h4>
+                            <p className="text-sm text-gray-400">GPU Rental</p>
+                          </div>
+                          <span>${state.gpu.price}/hr</span>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400">No GPU selected</p>
+                      )}
+                      <div className="border-t border-gray-700 my-2" />
+                      {state.aiModel ? (
+                        <div className="flex justify-between items-center text-white">
+                          <div>
+                            <h4 className="font-medium">{state.aiModel.name}</h4>
+                            <p className="text-sm text-gray-400">AI Model</p>
+                          </div>
+                          <span>${state.aiModel.price}/hr</span>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400">No AI Model selected</p>
+                      )}
+
+                      {(state.gpu || state.aiModel) && (
+                        <>
+                          <div className="border-t border-gray-700 my-2" />
+                          <div className="flex justify-between items-center text-white">
+                            <span className="font-medium">Total</span>
+                            <span className="font-medium">${totalPrice}/hr</span>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              if (state.gpu && state.aiModel) {
+                                // Add compatibility check logic here
+                                const isCompatible = true; // Replace with actual check
+                                if (isCompatible) {
+                                  alert('Compatible! Proceeding to checkout...');
+                                } else {
+                                  alert('Selected GPU and AI Model are not compatible');
+                                }
+                              } else {
+                                alert('Please select both a GPU and an AI Model');
+                              }
+                            }}
+                            className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Check Compatibility
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <button 
               className="flex border-none rounded p-2 bg-transparent absolute right-2" 
@@ -102,6 +189,7 @@ const Header = () => {
 
       {/* <LoginModal /> */}
     </>
+
   );
 };
 
